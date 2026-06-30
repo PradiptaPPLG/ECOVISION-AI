@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/hooks/useTheme";
+import Link from "next/link";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -104,11 +105,11 @@ export default function Navbar() {
               )}
             </button>
 
-            <button className="relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-emerald-500 to-blue-600 p-0.5 text-sm font-medium text-white shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-emerald-500/30 active:scale-95">
+            <Link href="/scan" className="relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-emerald-500 to-blue-600 p-0.5 text-sm font-medium text-white shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-emerald-500/30 active:scale-95">
               <span className="relative rounded-full bg-zinc-950 px-5 py-2 transition-all duration-300 ease-in group-hover:bg-opacity-0 hover:bg-transparent">
                 Start Scanning
               </span>
-            </button>
+            </Link>
           </div>
 
           {/* Mobile Actions (Theme Toggle & Hamburger) */}
@@ -229,9 +230,13 @@ export default function Navbar() {
             About
           </a>
           <div className="pt-2">
-            <button className="w-full rounded-full bg-gradient-to-r from-emerald-500 to-blue-600 px-5 py-2.5 text-center text-sm font-semibold text-white shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-98">
+            <Link
+              href="/scan"
+              onClick={() => setIsOpen(false)}
+              className="block w-full rounded-full bg-gradient-to-r from-emerald-500 to-blue-600 px-5 py-2.5 text-center text-sm font-semibold text-white shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-98"
+            >
               Start Scanning
-            </button>
+            </Link>
           </div>
         </div>
       </div>
