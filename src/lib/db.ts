@@ -1,0 +1,326 @@
+import mysql from "mysql2/promise";
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  createdAt: string;
+}
+
+export interface ScanHistoryItem {
+  id: string;
+  userId: string;
+  wasteId: string;
+  name: string;
+  category: string;
+  confidence: number;
+  scannedAt: string;
+  co2Offset: number;
+  recyclable: boolean;
+}
+
+export interface UserStats {
+  totalScanned: number;
+  recyclableCount: number;
+  recyclingRate: number;
+  totalCo2Offset: number;
+  categoryBreakdown: Record<string, number>;
+}
+
+export const CO2_MULTIPLIERS: Record<string, number> = {
+  "plastic-pet": 2.4,
+  "plastic-hdpe": 1.8,
+  "paper": 0.5,
+  "cardboard": 0.8,
+  "glass": 1.2,
+  "metal-can": 1.6,
+  "organic-waste": 0.3,
+  "battery": 0.1,
+  "electronic-waste": 0.5,
+};
+
+let pool: mysql.Pool | null = null;
+
+/**
+ * Connects to MySQL, automatically checking/creating the target database
+ * and table schemas on startup.
+ */
+async function getPool(): Promise<mysql.Pool> {
+  if (pool) return pool;
+
+  const host = process.env.MYSQL_HOST || "127.0.0.1";
+  const user = process.env.MYSQL_USER || "root";
+  const password = process.env.MYSQL_PASSWORD || "";
+  const dbName = process.env.MYSQL_DATABASE || "ecovision_db";
+  const port = Number(process.env.MYSQL_PORT || 3306);
+
+  try {
+    // 1. Establish initial connection to check/create target database
+    const connection = await mysql.createConnection({
+      host,
+      user,
+      password,
+      port,
+    });
+    
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
+    await connection.end();
+
+    // 2. Initialize connection pool targeting the database
+    pool = mysql.createPool({
+      host,
+      user,
+      password,
+      database: dbName,
+      port,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+
+    // 3. Initialize tables
+    await initDb(pool);
+
+    console.log("[EcoVision Database] MySQL connection pool initialized and tables verified.");
+    return pool;
+  } catch (error) {
+    console.error("[EcoVision Database] Failed to initialize MySQL pool:", error);
+    throw error;
+  }
+}
+
+/**
+ * Generates initial tables in MySQL if they do not exist.
+ */
+async function initDb(p: mysql.Pool) {
+  // Create users table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(50) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      email VARCHAR(100) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create scan_history table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS scan_history (
+      id VARCHAR(50) PRIMARY KEY,
+      user_id VARCHAR(50) NOT NULL,
+      waste_id VARCHAR(50) NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      category VARCHAR(50) NOT NULL,
+      confidence INT NOT NULL,
+      scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      co2_offset DECIMAL(5,2) NOT NULL,
+      recyclable TINYINT(1) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+}
+
+/**
+ * USERS TRANSACTIONS
+ */
+
+export async function getUsers(): Promise<User[]> {
+  const p = await getPool();
+  try {
+    const [rows] = await p.query("SELECT * FROM users");
+    const users = rows as any[];
+    return users.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      passwordHash: row.password_hash,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  } catch (error) {
+    console.error("Error executing getUsers query:", error);
+    return [];
+  }
+}
+
+export async function saveUser(user: Omit<User, "id" | "createdAt">): Promise<User> {
+  const p = await getPool();
+  const id = `user_${Math.random().toString(36).substring(2, 11)}`;
+  const createdAt = new Date().toISOString();
+  
+  await p.query(
+    "INSERT INTO users (id, name, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+    [id, user.name, user.email, user.passwordHash, new Date(createdAt)]
+  );
+
+  return {
+    id,
+    name: user.name,
+    email: user.email,
+    passwordHash: user.passwordHash,
+    createdAt,
+  };
+}
+
+export async function findUserByEmail(email: string): Promise<User | null> {
+  const p = await getPool();
+  try {
+    const [rows] = await p.query("SELECT * FROM users WHERE email = ?", [email]);
+    const list = rows as any[];
+    if (list.length === 0) return null;
+    const row = list[0];
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      passwordHash: row.password_hash,
+      createdAt: new Date(row.created_at).toISOString(),
+    };
+  } catch (error) {
+    console.error("Error executing findUserByEmail query:", error);
+    return null;
+  }
+}
+
+export async function findUserById(id: string): Promise<User | null> {
+  const p = await getPool();
+  try {
+    const [rows] = await p.query("SELECT * FROM users WHERE id = ?", [id]);
+    const list = rows as any[];
+    if (list.length === 0) return null;
+    const row = list[0];
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      passwordHash: row.password_hash,
+      createdAt: new Date(row.created_at).toISOString(),
+    };
+  } catch (error) {
+    console.error("Error executing findUserById query:", error);
+    return null;
+  }
+}
+
+/**
+ * SCAN HISTORY TRANSACTIONS
+ */
+
+export async function getScanHistory(): Promise<ScanHistoryItem[]> {
+  const p = await getPool();
+  try {
+    const [rows] = await p.query("SELECT * FROM scan_history");
+    const list = rows as any[];
+    return list.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      wasteId: row.waste_id,
+      name: row.name,
+      category: row.category,
+      confidence: row.confidence,
+      scannedAt: new Date(row.scanned_at).toISOString(),
+      co2Offset: Number(row.co2_offset),
+      recyclable: Boolean(row.recyclable),
+    }));
+  } catch (error) {
+    console.error("Error executing getScanHistory query:", error);
+    return [];
+  }
+}
+
+export async function getUserHistory(userId: string): Promise<ScanHistoryItem[]> {
+  const p = await getPool();
+  try {
+    const [rows] = await p.query(
+      "SELECT * FROM scan_history WHERE user_id = ? ORDER BY scanned_at DESC",
+      [userId]
+    );
+    const list = rows as any[];
+    return list.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      wasteId: row.waste_id,
+      name: row.name,
+      category: row.category,
+      confidence: row.confidence,
+      scannedAt: new Date(row.scanned_at).toISOString(),
+      co2Offset: Number(row.co2_offset),
+      recyclable: Boolean(row.recyclable),
+    }));
+  } catch (error) {
+    console.error("Error executing getUserHistory query:", error);
+    return [];
+  }
+}
+
+export async function saveScan(
+  userId: string,
+  item: Omit<ScanHistoryItem, "id" | "userId" | "scannedAt" | "co2Offset">
+): Promise<ScanHistoryItem> {
+  const p = await getPool();
+  const id = `scan_${Math.random().toString(36).substring(2, 11)}`;
+  const scannedAt = new Date().toISOString();
+  const co2Offset = CO2_MULTIPLIERS[item.wasteId] || 0.2;
+
+  await p.query(
+    `INSERT INTO scan_history (id, user_id, waste_id, name, category, confidence, scanned_at, co2_offset, recyclable) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, userId, item.wasteId, item.name, item.category, item.confidence, new Date(scannedAt), co2Offset, item.recyclable ? 1 : 0]
+  );
+
+  return {
+    id,
+    userId,
+    wasteId: item.wasteId,
+    name: item.name,
+    category: item.category,
+    confidence: item.confidence,
+    scannedAt,
+    co2Offset,
+    recyclable: item.recyclable,
+  };
+}
+
+/**
+ * STATS CALCULATIONS
+ */
+
+export async function getUserStats(userId: string): Promise<UserStats> {
+  const history = await getUserHistory(userId);
+  const totalScanned = history.length;
+  
+  if (totalScanned === 0) {
+    return {
+      totalScanned: 0,
+      recyclableCount: 0,
+      recyclingRate: 0,
+      totalCo2Offset: 0,
+      categoryBreakdown: {},
+    };
+  }
+
+  let recyclableCount = 0;
+  let totalCo2Offset = 0;
+  const categoryBreakdown: Record<string, number> = {};
+
+  history.forEach((item) => {
+    if (item.recyclable) {
+      recyclableCount++;
+    }
+    totalCo2Offset += item.co2Offset;
+
+    const cat = item.category || "Unknown";
+    categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1;
+  });
+
+  const recyclingRate = Math.round((recyclableCount / totalScanned) * 100);
+  
+  return {
+    totalScanned,
+    recyclableCount,
+    recyclingRate,
+    totalCo2Offset: Number(totalCo2Offset.toFixed(2)),
+    categoryBreakdown,
+  };
+}
