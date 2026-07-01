@@ -169,5 +169,42 @@ export class GeminiProvider implements AIProvider {
       confidence,
     };
   }
+
+  /**
+   * Converses with the AI model using chat messages history.
+   *
+   * @param messages - Array of chat history messages.
+   * @returns The AI response text.
+   */
+  public async chat(messages: { role: string; content: string }[]): Promise<string> {
+    // Map messages history to Gemini SDK structure
+    const contents = messages.map((msg) => ({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    }));
+
+    try {
+      const response = await this.client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents,
+        config: {
+          systemInstruction: `You are the EcoVision AI Assistant, a virtual assistant expert in waste sorting, recycling, environmental conservation, and sustainability.
+Your mission is to help users manage waste responsibly, explain recycling techniques, and provide environmental educational context.
+
+GUIDELINES:
+- Keep your tone friendly, encouraging, and informative.
+- Answer in the same language the user is speaking (primarily Indonesian or English).
+- Safety Boundary (Responsible AI): You must ONLY answer questions related to waste management, recycling, green technology, environmental statistics, climate change, or sustainability. If a user asks about off-topic queries (e.g., general history, mathematics, programming, general pop culture, etc.), you must politely decline and guide the conversation back to environmental topics.
+- Example decline response: "Maaf, sebagai asisten EcoVision AI, saya hanya dapat menjawab pertanyaan yang berhubungan dengan pengelolaan sampah, daur ulang, dan kelestarian lingkungan. Ada yang bisa saya bantu terkait topik tersebut?"
+- Never claim 100% accuracy. If asked for specific regional guidelines, remind the user to verify with their local municipal guidelines.`,
+        },
+      });
+
+      return response.text ?? "";
+    } catch (error) {
+      console.error("GeminiProvider: Chat generation failed:", error);
+      throw new Error(`GeminiProvider: Chat failed — ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 

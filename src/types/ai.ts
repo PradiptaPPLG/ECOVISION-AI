@@ -21,4 +21,11 @@ export interface AIProvider {
    * @returns A promise that resolves to an AIResult.
    */
   analyze(image: File): Promise<AIResult>;
+
+  /**
+   * Converses with the AI model using chat messages history.
+   * @param messages - Array of chat history messages.
+   * @returns The AI response text.
+   */
+  chat?(messages: { role: string; content: string }[]): Promise<string>;
 }

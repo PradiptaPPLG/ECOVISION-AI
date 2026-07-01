@@ -42,4 +42,27 @@ export class AIService {
       throw error;
     }
   }
+
+  /**
+   * Generates a conversational response based on chat history.
+   * 
+   * @param messages - Array of chat messages.
+   * @returns A promise resolving to the AI response text.
+   */
+  public async chat(messages: { role: string; content: string }[]): Promise<string> {
+    try {
+      if (!messages || messages.length === 0) {
+        throw new Error("No messages provided for chat.");
+      }
+
+      if (typeof this.provider.chat !== "function") {
+        throw new Error("Current provider does not support chat operations.");
+      }
+
+      return await this.provider.chat(messages);
+    } catch (error) {
+      console.error("AI Chat failed in AIService:", error);
+      throw error;
+    }
+  }
 }
