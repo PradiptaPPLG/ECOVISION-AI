@@ -7,7 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Link from "next/link";
-import { ScanHistoryItem, UserStats } from "@/lib/db";
+import { ScanHistoryItem, UserStats, ChatSession } from "@/lib/db";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -16,6 +16,8 @@ export default function DashboardPage() {
 
   const [stats, setStats] = useState<UserStats | null>(null);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [activeTab, setActiveTab] = useState<"scan" | "chat">("scan");
   const [dataLoading, setDataLoading] = useState(true);
 
   // Authenticate session redirection
@@ -35,16 +37,19 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setDataLoading(true);
     try {
-      const [statsRes, historyRes] = await Promise.all([
+      const [statsRes, historyRes, chatRes] = await Promise.all([
         fetch("/api/stats"),
         fetch("/api/history"),
+        fetch("/api/chat/sessions"),
       ]);
 
       const statsData = await statsRes.json();
       const historyData = await historyRes.json();
+      const chatData = await chatRes.json();
 
       if (statsData.success) setStats(statsData.stats);
       if (historyData.success) setHistory(historyData.history);
+      if (chatData.success) setChatSessions(chatData.sessions);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
     } finally {
@@ -221,78 +226,154 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Recent Scans list */}
           <div className="lg:col-span-2 space-y-6">
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-              {t("dashboard.historyTitle")}
-            </h2>
-
-            {history.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/20 p-12 text-center">
-                <div className="text-4xl mb-4">🌱</div>
-                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                  {t("dashboard.noHistory")}
-                </p>
-                <div className="mt-6">
-                  <Link
-                    href="/scan"
-                    className="inline-flex items-center rounded-full bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
-                  >
-                    {t("hero.cta")}
-                  </Link>
-                </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                {activeTab === "scan" ? t("dashboard.historyTitle") : t("dashboard.chatHistory")}
+              </h2>
+              
+              {/* Tab Selector */}
+              <div className="inline-flex rounded-full bg-zinc-200/50 p-1 dark:bg-zinc-800/50 backdrop-blur-sm self-start sm:self-auto shrink-0">
+                <button
+                  onClick={() => setActiveTab("scan")}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === "scan"
+                      ? "bg-gradient-to-r from-emerald-500 to-blue-600 text-white shadow-sm"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  📊 {t("dashboard.scanHistory")}
+                </button>
+                <button
+                  onClick={() => setActiveTab("chat")}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === "chat"
+                      ? "bg-gradient-to-r from-emerald-500 to-blue-600 text-white shadow-sm"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  💬 {t("dashboard.chatHistory")}
+                </button>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {history.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-2xl bg-white border border-zinc-200/50 shadow-[0_4px_20px_rgb(0,0,0,0.01)] hover:shadow-md transition-shadow dark:bg-zinc-950 dark:border-zinc-800/50 gap-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      {getCategoryIcon(item.category)}
-                      <div>
-                        <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-base">
-                          {item.name}
-                        </h3>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-zinc-500">
-                          <span>{item.category}</span>
-                          <span>•</span>
-                          <span>{formatDate(item.scannedAt)}</span>
-                        </div>
-                      </div>
-                    </div>
+            </div>
 
-                    <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end border-t border-zinc-100 sm:border-0 pt-3 sm:pt-0">
-                      <div className="text-right sm:text-right">
-                        <span
-                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            item.recyclable
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
-                              : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
-                          }`}
-                        >
-                          {item.recyclable
-                            ? language === "id"
-                              ? "Daur Ulang"
-                              : "Recyclable"
-                            : language === "id"
-                            ? "Residu"
-                            : "Residual"}
-                        </span>
-                        <div className="text-[10px] text-zinc-400 mt-0.5">
-                          {t("common.confidenceScore")}: {item.confidence}%
-                        </div>
-                      </div>
-
-                      <Link
-                        href={`/result?id=${item.wasteId}&confidence=${item.confidence}`}
-                        className="rounded-xl border border-zinc-200/60 bg-zinc-50 hover:bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-700 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
-                      >
-                        {t("dashboard.viewDetails")}
-                      </Link>
-                    </div>
+            {activeTab === "scan" ? (
+              history.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/20 p-12 text-center">
+                  <div className="text-4xl mb-4">🌱</div>
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {t("dashboard.noHistory")}
+                  </p>
+                  <div className="mt-6">
+                    <Link
+                      href="/scan"
+                      className="inline-flex items-center rounded-full bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                    >
+                      {t("hero.cta")}
+                    </Link>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {history.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-2xl bg-white border border-zinc-200/50 shadow-[0_4px_20px_rgb(0,0,0,0.01)] hover:shadow-md transition-shadow dark:bg-zinc-950 dark:border-zinc-800/50 gap-4"
+                    >
+                      <div className="flex items-center gap-4">
+                        {getCategoryIcon(item.category)}
+                        <div>
+                          <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-base">
+                            {item.name}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-zinc-500">
+                            <span>{item.category}</span>
+                            <span>•</span>
+                            <span>{formatDate(item.scannedAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end border-t border-zinc-100 sm:border-0 pt-3 sm:pt-0">
+                        <div className="text-right sm:text-right">
+                          <span
+                            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${item.recyclable
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
+                              }`}
+                          >
+                            {item.recyclable
+                              ? language === "id"
+                                ? "Daur Ulang"
+                                : "Recyclable"
+                              : language === "id"
+                                ? "Residu"
+                                : "Residual"}
+                          </span>
+                          <div className="text-[10px] text-zinc-400 mt-0.5">
+                            {t("common.confidenceScore")}: {item.confidence}%
+                          </div>
+                        </div>
+
+                        <Link
+                          href={`/result?id=${item.wasteId}&confidence=${item.confidence}`}
+                          className="rounded-xl border border-zinc-200/60 bg-zinc-50 hover:bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-700 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+                        >
+                          {t("dashboard.viewDetails")}
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              chatSessions.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/20 p-12 text-center">
+                  <div className="text-4xl mb-4">💬</div>
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {t("dashboard.noChatHistory")}
+                  </p>
+                  <div className="mt-6">
+                    <Link
+                      href="/assistant"
+                      className="inline-flex items-center rounded-full bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                    >
+                      {t("nav.assistant")}
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {chatSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-2xl bg-white border border-zinc-200/50 shadow-[0_4px_20px_rgb(0,0,0,0.01)] hover:shadow-md transition-shadow dark:bg-zinc-950 dark:border-zinc-800/50 gap-4"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <span className="p-3 bg-blue-50 dark:bg-blue-500/10 rounded-2xl text-blue-600 dark:text-blue-400 text-xl shrink-0">
+                          💬
+                        </span>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-zinc-900 dark:text-zinc-50 text-base truncate">
+                            {session.title}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+                            <span>{formatDate(session.updatedAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 w-full sm:w-auto justify-end border-t border-zinc-100 sm:border-0 pt-3 sm:pt-0 shrink-0">
+                        <Link
+                          href={`/assistant?session=${session.id}`}
+                          className="rounded-xl bg-gradient-to-r from-emerald-500 to-blue-600 hover:scale-105 active:scale-95 text-white px-4 py-2 text-xs font-semibold transition-all shadow-sm shadow-emerald-500/10 cursor-pointer"
+                        >
+                          {t("dashboard.continueChat")}
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
 

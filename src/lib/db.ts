@@ -324,3 +324,121 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     categoryBreakdown,
   };
 }
+
+/**
+ * CHAT HISTORY PERSISTENCE HELPMATES
+ */
+
+export interface ChatSession {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessageItem {
+  id?: number;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  image?: string;
+  createdAt?: string;
+}
+
+export async function getChatSessions(userId: string): Promise<ChatSession[]> {
+  const p = await getPool();
+  try {
+    const [rows] = await p.query(
+      "SELECT * FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC",
+      [userId]
+    );
+    const list = rows as Array<{ id: string; user_id: string; title: string; created_at: Date; updated_at: Date }>;
+    return list.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      title: row.title,
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+    }));
+  } catch (error) {
+    console.error("Error executing getChatSessions query:", error);
+    return [];
+  }
+}
+
+export async function getChatMessages(sessionId: string): Promise<ChatMessageItem[]> {
+  const p = await getPool();
+  try {
+    const [rows] = await p.query(
+      "SELECT * FROM chat_messages WHERE session_id = ? ORDER BY id ASC",
+      [sessionId]
+    );
+    const list = rows as Array<{ id: number; session_id: string; role: string; content: string; image: string | null; created_at: Date }>;
+    return list.map((row) => ({
+      id: row.id,
+      sessionId: row.session_id,
+      role: row.role as "user" | "assistant",
+      content: row.content,
+      image: row.image || undefined,
+      createdAt: row.created_at.toISOString(),
+    }));
+  } catch (error) {
+    console.error("Error executing getChatMessages query:", error);
+    return [];
+  }
+}
+
+export async function saveChatMessage(
+  sessionId: string | null,
+  userId: string,
+  role: "user" | "assistant",
+  content: string,
+  image?: string
+): Promise<{ sessionId: string; title: string }> {
+  const p = await getPool();
+  let currentSessionId = sessionId;
+  let title = "Obrolan AI EcoVision";
+
+  try {
+    if (!currentSessionId || currentSessionId === "new") {
+      currentSessionId = `chat_${Math.random().toString(36).substring(2, 11)}`;
+      const cleanContent = content.trim().replace(/\n/g, " ");
+      title = cleanContent.length > 40 ? cleanContent.substring(0, 40) + "..." : cleanContent || title;
+
+      await p.query(
+        "INSERT INTO chat_sessions (id, user_id, title) VALUES (?, ?, ?)",
+        [currentSessionId, userId, title]
+      );
+    } else {
+      const [rows] = await p.query(
+        "SELECT title FROM chat_sessions WHERE id = ?",
+        [currentSessionId]
+      );
+      const list = rows as Array<{ title: string }>;
+      if (list.length > 0) {
+        title = list[0].title;
+      } else {
+        await p.query(
+          "INSERT INTO chat_sessions (id, user_id, title) VALUES (?, ?, ?)",
+          [currentSessionId, userId, title]
+        );
+      }
+    }
+
+    await p.query(
+      "INSERT INTO chat_messages (session_id, role, content, image) VALUES (?, ?, ?, ?)",
+      [currentSessionId, role, content, image || null]
+    );
+
+    await p.query(
+      "UPDATE chat_sessions SET updated_at = NOW() WHERE id = ?",
+      [currentSessionId]
+    );
+
+    return { sessionId: currentSessionId, title };
+  } catch (error) {
+    console.error("Error executing saveChatMessage transaction:", error);
+    throw error;
+  }
+}

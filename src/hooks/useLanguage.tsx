@@ -410,10 +410,86 @@ const dictionary: Record<string, Record<Language, string>> = {
     en: "Material Categories Breakdown",
     id: "Rincian Kategori Material",
   },
+  "hero.cta": {
+    en: "Start Scanning",
+    id: "Mulai Memindai",
+  },
+  "dashboard.scanHistory": {
+    en: "Scan History",
+    id: "Riwayat Pindai",
+  },
+  "dashboard.chatHistory": {
+    en: "Chat History",
+    id: "Riwayat Obrolan",
+  },
+  "dashboard.noChatHistory": {
+    en: "No chat history recorded. Start talking to our AI Assistant!",
+    id: "Belum ada riwayat obrolan. Mulai mengobrol dengan Asisten AI!",
+  },
+  "dashboard.continueChat": {
+    en: "Continue Conversation",
+    id: "Lanjutkan Percakapan",
+  },
   // Sprint 4 AI Assistant Keys
   "nav.assistant": {
     en: "AI Assistant",
     id: "Asisten AI",
+  },
+  "nav.testing": {
+    en: "Model Testing",
+    id: "Pengujian Model",
+  },
+  "testing.title": {
+    en: "AI Model Dataset Testing",
+    id: "Pengujian Dataset Model AI",
+  },
+  "testing.subtitle": {
+    en: "Upload a batch of images with target labels to run accuracy validation checks on the model.",
+    id: "Unggah sekumpulan gambar dengan label target untuk menjalankan validasi akurasi model.",
+  },
+  "testing.selectFiles": {
+    en: "Select Image Dataset",
+    id: "Pilih Dataset Gambar",
+  },
+  "testing.runBtn": {
+    en: "Run Model Validation",
+    id: "Jalankan Validasi Model",
+  },
+  "testing.clearBtn": {
+    en: "Clear All",
+    id: "Hapus Semua",
+  },
+  "testing.accuracy": {
+    en: "Validation Accuracy",
+    id: "Akurasi Validasi",
+  },
+  "testing.avgConfidence": {
+    en: "Average Confidence",
+    id: "Rata-rata Keyakinan",
+  },
+  "testing.successCount": {
+    en: "Success Count",
+    id: "Jumlah Sesuai",
+  },
+  "testing.filename": {
+    en: "Filename",
+    id: "Nama File",
+  },
+  "testing.targetLabel": {
+    en: "Target Label",
+    id: "Label Target",
+  },
+  "testing.predLabel": {
+    en: "Predicted",
+    id: "Hasil Prediksi",
+  },
+  "testing.match": {
+    en: "Match",
+    id: "Sesuai",
+  },
+  "testing.mismatch": {
+    en: "Mismatch",
+    id: "Tidak Sesuai",
   },
   "assistant.title": {
     en: "AI Eco-Assistant",
