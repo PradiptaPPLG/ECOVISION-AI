@@ -16,11 +16,47 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load chat session if parameter is provided in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionParam = params.get("session");
+    if (sessionParam) {
+      setCurrentSessionId(sessionParam);
+      loadSessionHistory(sessionParam);
+    }
+  }, []);
+
+  const loadSessionHistory = async (sessionId: string) => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/chat/sessions?id=${sessionId}`);
+      const data = await res.json();
+      if (data.success) {
+        setMessages(
+          data.messages.map((m: { role: "user" | "assistant"; content: string; image?: string }) => ({
+            role: m.role,
+            content: m.content,
+            image: m.image || undefined,
+          }))
+        );
+      } else {
+        setErrorMsg("Failed to load conversation history.");
+      }
+    } catch (err) {
+      console.error("Load session history error:", err);
+      setErrorMsg("Failed to load conversation history.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Auto-scroll to the bottom of the conversation
   useEffect(() => {
@@ -78,12 +114,19 @@ export default function AssistantPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({
+          messages: newMessages,
+          sessionId: currentSessionId,
+        }),
       });
 
       const data = await res.json();
       if (data.success) {
         setMessages([...newMessages, { role: "assistant", content: data.response }]);
+        if (data.sessionId && data.sessionId !== currentSessionId) {
+          setCurrentSessionId(data.sessionId);
+          window.history.pushState({}, "", `/assistant?session=${data.sessionId}`);
+        }
       } else {
         setErrorMsg(t("assistant.error"));
       }
@@ -99,6 +142,8 @@ export default function AssistantPage() {
     setMessages([]);
     setErrorMsg(null);
     setAttachedImage(null);
+    setCurrentSessionId(null);
+    window.history.pushState({}, "", "/assistant");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 

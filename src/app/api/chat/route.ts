@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AIService } from "@/services/ai/aiService";
 import { ProviderManager } from "@/services/ai/providerManager";
+import { saveChatMessage } from "@/lib/db";
+import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages } = body;
+    const { messages, sessionId } = body;
 
     // Validation: Ensure messages array is present
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -32,9 +34,42 @@ export async function POST(req: NextRequest) {
     // Call chat service
     const responseText = await aiService.chat(messages);
 
+    // Persistence: If user is logged in, save conversation history
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session_token")?.value;
+    let finalSessionId = sessionId;
+
+    if (token) {
+      const lastUserMsg = messages[messages.length - 1];
+      if (lastUserMsg && lastUserMsg.role === "user") {
+        try {
+          // Save the user's message
+          const saveResult = await saveChatMessage(
+            sessionId,
+            token,
+            "user",
+            lastUserMsg.content,
+            lastUserMsg.image
+          );
+          finalSessionId = saveResult.sessionId;
+
+          // Save the assistant's response
+          await saveChatMessage(
+            finalSessionId,
+            token,
+            "assistant",
+            responseText
+          );
+        } catch (dbError) {
+          console.error("Failed to save chat message history:", dbError);
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       response: responseText,
+      sessionId: finalSessionId,
     });
   } catch (error) {
     console.error("[EcoVision API] Chat error:", error);
