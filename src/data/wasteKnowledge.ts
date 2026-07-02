@@ -192,7 +192,7 @@ export const wasteKnowledgeDB: BilingualWasteKnowledge[] = [
     categoryId: "Organik",
     descriptionEn: "Food scraps, yard waste, and other biodegradable materials.",
     descriptionId: "Sisa makanan, sampah halaman, dan bahan biodegradable lainnya.",
-    recyclable: false,
+    recyclable: true,
     recyclingBinEn: "Brown Bin / Compost",
     recyclingBinId: "Tempat Sampah Cokelat / Kompos",
     estimatedDecompositionEn: "2 weeks - 6 months",
