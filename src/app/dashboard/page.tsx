@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [chatSessions, setChatSessions] = useState<ChatSession[] | LocalChatSession[]>([]);
   const [activeTab, setActiveTab] = useState<"scan" | "chat">("scan");
   const [dataLoading, setDataLoading] = useState(true);
+  const [currentScanPage, setCurrentScanPage] = useState(1);
 
   // Authenticate session redirection — only in MySQL mode
   useEffect(() => {
@@ -151,6 +152,12 @@ export default function DashboardPage() {
     });
   };
 
+  const itemsPerPage = 5;
+  const indexOfLastScan = currentScanPage * itemsPerPage;
+  const indexOfFirstScan = indexOfLastScan - itemsPerPage;
+  const currentScans = history.slice(indexOfFirstScan, indexOfLastScan);
+  const totalScanPages = Math.ceil(history.length / itemsPerPage);
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-900/40 relative overflow-hidden">
       {/* Decorative background glows */}
@@ -159,22 +166,16 @@ export default function DashboardPage() {
       <Navbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
-        {/* Dashboard Header */}
-        <div className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* Header Section */}
+        <div className="mb-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               {t("dashboard.title")}
             </h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-2 text-zinc-500 dark:text-zinc-400">
               {t("dashboard.subtitle")}
             </p>
           </div>
-          <Link
-            href="/scan"
-            className="self-start rounded-full bg-gradient-to-r from-emerald-500 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-98 transition-all hover:scale-[1.02]"
-          >
-            {t("hero.cta")}
-          </Link>
         </div>
 
         {/* Stats Section */}
@@ -291,7 +292,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {history.map((item) => (
+                  {currentScans.map((item) => (
                     <div
                       key={item.id}
                       className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-2xl bg-white border border-zinc-200/50 shadow-[0_4px_20px_rgb(0,0,0,0.01)] hover:shadow-md transition-shadow dark:bg-zinc-950 dark:border-zinc-800/50 gap-4"
@@ -332,7 +333,8 @@ export default function DashboardPage() {
                         </div>
 
                         <Link
-                          href={`/result?id=${item.wasteId}&confidence=${item.confidence}`}
+                          href={`/result?id=${item.wasteId}&confidence=${item.confidence}&history=1`}
+                          onClick={() => sessionStorage.setItem("historyImage", (item as any).imageUrl || "")}
                           className="rounded-xl border border-zinc-200/60 bg-zinc-50 hover:bg-zinc-100 px-4 py-2 text-xs font-semibold text-zinc-700 transition-colors dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
                         >
                           {t("dashboard.viewDetails")}
@@ -340,6 +342,28 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   ))}
+                  
+                  {totalScanPages > 1 && (
+                    <div className="flex items-center justify-center space-x-3 pt-6 pb-2">
+                      <button
+                        onClick={() => setCurrentScanPage(p => Math.max(1, p - 1))}
+                        disabled={currentScanPage === 1}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        {language === "id" ? "Sebelumnya" : "Prev"}
+                      </button>
+                      <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                        {currentScanPage} / {totalScanPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentScanPage(p => Math.min(totalScanPages, p + 1))}
+                        disabled={currentScanPage === totalScanPages}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        {language === "id" ? "Berikutnya" : "Next"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             ) : (
@@ -350,12 +374,12 @@ export default function DashboardPage() {
                     {t("dashboard.noChatHistory")}
                   </p>
                   <div className="mt-6">
-                    <Link
-                      href="/assistant"
-                      className="inline-flex items-center rounded-full bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                    <button
+                      onClick={() => window.dispatchEvent(new CustomEvent("open-chat"))}
+                      className="inline-flex items-center rounded-full bg-emerald-50 px-5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20 cursor-pointer"
                     >
                       {t("nav.assistant")}
-                    </Link>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -380,12 +404,12 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex items-center gap-4 w-full sm:w-auto justify-end border-t border-zinc-100 sm:border-0 pt-3 sm:pt-0 shrink-0">
-                        <Link
-                          href={`/assistant?session=${session.id}`}
+                        <button
+                          onClick={() => window.dispatchEvent(new CustomEvent("open-chat", { detail: { sessionId: session.id } }))}
                           className="rounded-xl bg-gradient-to-r from-emerald-500 to-blue-600 hover:scale-105 active:scale-95 text-white px-4 py-2 text-xs font-semibold transition-all shadow-sm shadow-emerald-500/10 cursor-pointer"
                         >
                           {t("dashboard.continueChat")}
-                        </Link>
+                        </button>
                       </div>
                     </div>
                   ))}
